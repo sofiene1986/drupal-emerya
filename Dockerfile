@@ -108,9 +108,6 @@ RUN ( \
 
 RUN a2enmod rewrite expires && service apache2 restart
 
-# Our apache volume
-VOLUME /var/www/html
-
 # ssh keys
 RUN mkdir /var/www/.ssh/
 RUN chown -R www-data:www-data /var/www/.ssh/
