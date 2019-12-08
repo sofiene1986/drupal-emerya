@@ -1,8 +1,4 @@
 FROM php:7.3.0-apache
-# ADD BASHRC CONFIG
-COPY config/bashrc /root/
-RUN mv /root/bashrc /root/.bashrc
-
 RUN apt-get update && apt-get install --fix-missing wget -y
 RUN echo "deb http://packages.dotdeb.org jessie all" >> /etc/apt/sources.list
 RUN echo "deb-src http://packages.dotdeb.org jessie all" >> /etc/apt/sources.list
@@ -12,6 +8,8 @@ RUN wget https://www.dotdeb.org/dotdeb.gpg
 RUN apt-key add dotdeb.gpg
 
 RUN apt-get update && apt-get install --fix-missing -y \
+  libgd3 \
+  libgd-dev\
   apt-transport-https \
   apt-utils \
   cloc \
@@ -33,16 +31,20 @@ RUN apt-get update && apt-get install --fix-missing -y \
   sudo \
   tree \
   vim \
+  memcached \
+  libmemcached-tools \
+  libmemcached-dev \
   wget \
+  bash-completion \
   zip
+
 RUN chmod +x /usr/local/bin/docker-php-ext-install
-RUN docker-php-ext-configure gd --with-jpeg-dir=/usr/include/
+RUN docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/
+RUN docker-php-ext-install -j$(nproc) gd
 RUN docker-php-ext-install calendar
 RUN docker-php-ext-install exif
-RUN docker-php-ext-install gd
 RUN docker-php-ext-install intl
 RUN docker-php-ext-install mbstring
-#RUN docker-php-ext-install mcrypt
 RUN docker-php-ext-install bcmath
 RUN docker-php-ext-install opcache
 RUN docker-php-ext-install pdo_mysql
@@ -88,12 +90,6 @@ RUN rm -rf /var/www/html
 RUN mkdir -p /var/lock/apache2 /var/run/apache2 /var/log/apache2 /var/www/html
 RUN chown -R www-data:www-data /var/lock/apache2 /var/run/apache2 /var/log/apache2 /var/www
 
-# installation of ssmtp
-RUN DEBIAN_FRONTEND=noninteractive apt-get install --fix-missing -y ssmtp
-RUN rm -r /var/lib/apt/lists/*
-ADD core/ssmtp.conf /etc/ssmtp/ssmtp.conf
-ADD core/php-smtp.ini /usr/local/etc/php/conf.d/php-smtp.ini
-
 COPY config/apache2.conf /etc/apache2
 
 # Installation of Opcode cache
@@ -107,11 +103,18 @@ RUN ( \
   ) > /usr/local/etc/php/conf.d/opcache-recommended.ini
 
 RUN a2enmod rewrite expires && service apache2 restart
-
+RUN apt-get install libfreetype6-dev
 # ssh keys
 RUN mkdir /var/www/.ssh/
 RUN chown -R www-data:www-data /var/www/.ssh/
 RUN chmod 600 /var/www/.ssh/
-
+RUN useradd web -d /var/www -g www-data -s /bin/bash
+RUN usermod -aG sudo web
+RUN echo 'web ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN echo 'www-data ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN chown -R web:www-data /var/www/html
+RUN chown -R web:www-data /var/www/html
+# ADD BASHRC CONFIG
+COPY config/.bashrc /root/.bashrc
 # Expose 80 for apache, 9000 for xdebug
 EXPOSE 80 9000
