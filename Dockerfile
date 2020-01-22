@@ -113,7 +113,11 @@ RUN usermod -aG sudo web
 RUN echo 'web ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 RUN echo 'www-data ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 RUN chown -R web:www-data /var/www/html
-RUN chown -R web:www-data /var/www/html
+RUN mkdir /var/www/.composer
+RUN chown -R web:www-data /var/www/.composer
+RUN mkdir /var/www/cache
+RUN chown -R web:www-data /var/www/cache
+RUN chmod -R 777 /var/www/cache
 # ADD BASHRC CONFIG
 COPY config/.bashrc /root/.bashrc
 # Expose 80 for apache, 9000 for xdebug
