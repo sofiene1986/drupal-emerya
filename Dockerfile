@@ -74,24 +74,16 @@ RUN npm install -g bower
 # Installation of Composer
 RUN cd /usr/src && curl -sS http://getcomposer.org/installer | php
 RUN cd /usr/src && mv composer.phar /usr/bin/composer
-
-# Install xdebug. We need at least 2.4 version to have PHP 7 support.
-RUN cd /tmp/ && wget http://xdebug.org/files/xdebug-2.8.0.tgz && tar -xvzf xdebug-2.8.0.tgz && cd xdebug-2.8.0/ && phpize && ./configure --enable-xdebug --with-php-config=/usr/local/bin/php-config && make && make install
-RUN cd /tmp/xdebug-2.8.0 && cp modules/xdebug.so /usr/local/lib/php/extensions/no-debug-non-zts-20180731/
-RUN echo 'zend_extension = /usr/local/lib/php/extensions/no-debug-non-zts-20180731/xdebug.so' >> /usr/local/etc/php/php.ini
-RUN touch /usr/local/etc/php/conf.d/xdebug.ini &&\
-  echo 'xdebug.remote_enable=1' >> /usr/local/etc/php/conf.d/xdebug.ini &&\
-  echo 'xdebug.remote_autostart=0' >> /usr/local/etc/php/conf.d/xdebug.ini &&\
-  echo 'xdebug.remote_connect_back=0' >> /usr/local/etc/php/conf.d/xdebug.ini &&\
-  echo 'xdebug.remote_port=9000' >> /usr/local/etc/php/conf.d/xdebug.ini &&\
-  echo 'xdebug.remote_log=/tmp/php7-xdebug.log' >> /usr/local/etc/php/conf.d/xdebug.ini &&\
-  echo 'xdebug.remote_host=host_machine' >> /usr/local/etc/php/conf.d/xdebug.ini &&\
-  echo 'xdebug.idekey=PHPSTORM' >> /usr/local/etc/php/conf.d/xdebug.ini
+RUN cd /usr/src
+# Install xdebug for PHP 7
+RUN pecl install xdebug-2.9.1
+COPY config/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
 
 RUN rm -rf /var/www/html
+
+# Apache configuration
 RUN mkdir -p /var/lock/apache2 /var/run/apache2 /var/log/apache2 /var/www/html
 RUN chown -R www-data:www-data /var/lock/apache2 /var/run/apache2 /var/log/apache2 /var/www
-
 COPY config/apache2.conf /etc/apache2
 
 # Installation of Opcode cache
@@ -104,14 +96,26 @@ RUN ( \
   echo "opcache.enable_cli=1"; \
   ) > /usr/local/etc/php/conf.d/opcache-recommended.ini
 
-RUN a2enmod rewrite expires && service apache2 restart
+#Install APCU Extension
+RUN apt-get -y install gcc make autoconf libc-dev pkg-config
+RUN pecl install apcu
+RUN echo 'extension=apcu.so' >> /usr/local/etc/php/conf.d/apcu.ini
+RUN a2enmod rewrite expires
+
+# Install ping utility
+RUN apt-get install -y iputils-ping
+
 RUN apt-get install libfreetype6-dev
+RUN service apache2 restart
 # ssh keys
 RUN mkdir /var/www/.ssh/
 RUN chown -R www-data:www-data /var/www/.ssh/
 RUN chmod 600 /var/www/.ssh/
+
+# Create and configure web user access
 RUN useradd web -d /var/www -g www-data -s /bin/bash
 RUN usermod -aG sudo web
+RUN usermod -a -G www-data web
 RUN echo 'web ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 RUN echo 'www-data ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 RUN chown -R web:www-data /var/www/html
@@ -120,7 +124,11 @@ RUN chown -R web:www-data /var/www/.composer
 RUN mkdir /var/www/cache
 RUN chown -R web:www-data /var/www/cache
 RUN chmod -R 777 /var/www/cache
+
 # ADD BASHRC CONFIG
 COPY config/.bashrc /root/.bashrc
+RUN chown -R www-data:www-data /tmp
+RUN chmod -R 777 /tmp
 # Expose 80 for apache, 9000 for xdebug
+VOLUME /var/www/html
 EXPOSE 80 9000
